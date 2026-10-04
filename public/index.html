@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dodge the Blocks</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #111827, #312e81);
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+
+    .game-container {
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      color: #60a5fa;
+    }
+
+    #score {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    canvas {
+      display: block;
+      background: #0f172a;
+      border: 3px solid #60a5fa;
+      border-radius: 12px;
+      box-shadow: 0 0 30px rgba(96, 165, 250, 0.3);
+    }
+
+    #message {
+      margin-top: 12px;
+      font-size: 18px;
+    }
+
+    button {
+      margin-top: 12px;
+      padding: 10px 25px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .controls {
+      margin-top: 10px;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="game-container">
+  <h1>🚀 Dodge the Blocks</h1>
+
+  <div id="score">Score: 0</div>
+
+  <canvas id="game" width="400" height="600"></canvas>
+
+  <div id="message">Use ← → or A/D to move</div>
+
+  <button onclick="restartGame()">Restart</button>
+
+  <div class="controls">
+    Dodge the red blocks!
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const scoreElement = document.getElementById("score");
+const messageElement = document.getElementById("message");
+
+let player;
+let blocks;
+let score;
+let gameOver;
+let keys;
+let lastTime;
+let spawnTimer;
+
+function initGame() {
+  player = {
+    x: canvas.width / 2 - 20,
+    y: canvas.height - 70,
+    width: 40,
+    height: 40,
+    speed: 300
+  };
+
+  blocks = [];
+  score = 0;
+  gameOver = false;
+  keys = {};
+  lastTime = performance.now();
+  spawnTimer = 0;
+
+  scoreElement.textContent = "Score: 0";
+  messageElement.textContent = "Use ← → or A/D to move";
+
+  requestAnimationFrame(gameLoop);
+}
+
+function spawnBlock() {
+  const size = 25 + Math.random() * 35;
+
+  blocks.push({
+    x: Math.random() * (canvas.width - size),
+    y: -size,
+    width: size,
+    height: size,
+    speed: 150 + score * 4 + Math.random() * 100
+  });
+}
+
+function update(delta) {
+  if (gameOver) return;
+
+  // Player movement
+  if (keys["ArrowLeft"] || keys["a"] || keys["A"]) {
+    player.x -= player.speed * delta;
+  }
+
+  if (keys["ArrowRight"] || keys["d"] || keys["D"]) {
+    player.x += player.speed * delta;
+  }
+
+  // Keep player inside canvas
+  if (player.x < 0) {
+    player.x = 0;
+  }
+
+  if (player.x + player.width > canvas.width) {
+    player.x = canvas.width - player.width;
+  }
+
+  // Spawn blocks
+  spawnTimer += delta;
+
+  const spawnRate = Math.max(0.25, 0.8 - score * 0.01);
+
+  if (spawnTimer > spawnRate) {
+    spawnBlock();
+    spawnTimer = 0;
+  }
+
+  // Move blocks
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i];
+
+    block.y += block.speed * delta;
+
+    // Remove blocks that leave screen
+    if (block.y > canvas.height) {
+      blocks.splice(i, 1);
+      score++;
+
+      scoreElement.textContent = "Score: " + score;
+    }
+
+    // Collision
+    if (collision(player, block)) {
+      endGame();
+    }
+  }
+}
+
+function collision(a, b) {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
+}
+
+function draw() {
+  // Background
+  ctx.fillStyle = "#0f172a";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Stars
+  ctx.fillStyle = "#334155";
+
+  for (let i = 0; i < 40; i++) {
+    const x = (i * 97) % canvas.width;
+    const y = (i * 53) % canvas.height;
+
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  // Player
+  ctx.fillStyle = "#3b82f6";
+  ctx.fillRect(
+    player.x,
+    player.y,
+    player.width,
+    player.height
+  );
+
+  // Player glow
+  ctx.shadowColor = "#60a5fa";
+  ctx.shadowBlur = 15;
+
+  ctx.fillStyle = "#60a5fa";
+  ctx.fillRect(
+    player.x + 8,
+    player.y + 8,
+    24,
+    24
+  );
+
+  ctx.shadowBlur = 0;
+
+  // Blocks
+  for (const block of blocks) {
+    ctx.fillStyle = "#ef4444";
+
+    ctx.shadowColor = "#ef4444";
+    ctx.shadowBlur = 12;
+
+    ctx.fillRect(
+      block.x,
+      block.y,
+      block.width,
+      block.height
+    );
+
+    ctx.shadowBlur = 0;
+  }
+}
+
+function gameLoop(time) {
+  const delta = Math.min((time - lastTime) / 1000, 0.05);
+
+  lastTime = time;
+
+  update(delta);
+  draw();
+
+  if (!gameOver) {
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+function endGame() {
+  gameOver = true;
+
+  messageElement.textContent =
+    "💥 Game Over! Your score: " + score;
+}
+
+function restartGame() {
+  initGame();
+}
+
+document.addEventListener("keydown", (event) => {
+  keys[event.key] = true;
+
+  if (
+    ["ArrowLeft", "ArrowRight", " "].includes(event.key)
+  ) {
+    event.preventDefault();
+  }
+
+  if (gameOver && event.key === "Enter") {
+    restartGame();
+  }
+});
+
+document.addEventListener("keyup", (event) => {
+  keys[event.key] = false;
+});
+
+initGame();
+</script>
+
+</body>
+</html>
